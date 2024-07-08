@@ -5,6 +5,8 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLa
 from PyQt5.QtCore import QTimer
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+import serial
+
 
 class VibrationFFTApp(QMainWindow):
     def __init__(self):
@@ -15,7 +17,7 @@ class VibrationFFTApp(QMainWindow):
         self.sampling_rate = 1000
         self.window_size = 500 
         self.fft_size = 2000
-        self.update_interval = 1  # 动画更新间隔为1毫秒，与采样频率相匹配
+        self.update_interval = 1  
 
         # 初始化数据
         self.data = np.zeros(self.window_size)
@@ -24,6 +26,10 @@ class VibrationFFTApp(QMainWindow):
         self.frequencies = np.fft.fftfreq(self.fft_size, 1 / self.sampling_rate)[:self.fft_size // 2]
 
         self.frame = 0
+
+        # 初始化串口通信
+        self.ser = serial.Serial('/dev/ttyACM0', 921600, timeout=1)  # 修改为你的串口端口和波特率
+        self.ser.flush()
         
         self.initUI()
 
@@ -44,7 +50,7 @@ class VibrationFFTApp(QMainWindow):
 
         # 创建振动数据图
         self.fig1, self.ax1 = plt.subplots()
-        self.ax1.set_ylim(-2, 2)
+        self.ax1.set_ylim(20, 45)
         self.ax1.set_xlim(0, self.window_size)
         self.ax1.set_title('Real-time Vibration Data')
         self.ax1.set_xlabel('Time')
@@ -73,8 +79,15 @@ class VibrationFFTApp(QMainWindow):
         # 目前的data默认是处理后的数据，也就是distance, 输出单个数据点
         # 之后修改这个函数，data改为从arduino中读取
         # 生成新的数据点，sin(20x) + sin(300x) 并添加噪声
-        t = self.frame / self.sampling_rate
-        return np.sin(2 * np.pi * 20 * t) + np.sin(2 * np.pi * 300 * t) + np.random.normal(0, 0.5)
+        # t = self.frame / self.sampling_rate
+        # return np.sin(2 * np.pi * 20 * t) + np.sin(2 * np.pi * 300 * t) + np.random.normal(0, 0.5)
+        if self.ser.in_waiting > 0:
+            line = self.ser.readline().decode('utf-8').rstrip()
+            try:
+                return float(line)
+            except ValueError:
+                return 0.0
+        return 0.0
 
     def update_plot(self):
         new_value = self.get_newdata()
