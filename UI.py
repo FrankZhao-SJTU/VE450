@@ -13,10 +13,10 @@ class VibrationFFTApp(QMainWindow):
     def __init__(self):
         super().__init__()
         
-        self.sampling_rate = 3000
-        self.window_size = 500 
-        self.fft_size = 2000
-        self.update_interval_ms = 1  # 1毫秒
+        self.sampling_rate = 50
+        self.window_size = 100 
+        self.fft_size = 100
+        self.update_interval_ms = 0  # 增加更新频率
 
         # 初始化数据
         self.data = np.zeros(self.window_size)
@@ -26,7 +26,7 @@ class VibrationFFTApp(QMainWindow):
 
         # 初始化串口通信
         try:
-            self.ser = serial.Serial('COM3', 921600, timeout=0.01)
+            self.ser = serial.Serial('/dev/ttyACM0', 57600, timeout=0.01)  # 设置合理的波特率
             self.ser.flush()
         except serial.SerialException as e:
             print(f"Could not open serial port: {e}")
@@ -39,7 +39,9 @@ class VibrationFFTApp(QMainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_plot)
         self.timer.start(self.update_interval_ms)
-
+        
+        # 初始化计数器
+        self.counter = 0
 
     def initUI(self):
         self.setWindowTitle('Real-time Vibration and FFT')
@@ -90,7 +92,6 @@ class VibrationFFTApp(QMainWindow):
         xs = np.linspace(0, 1, self.window_size)  # x轴时间点
         self.fig1, self.ax1 = plt.subplots()
         self.ax1.set_ylim(20, 45)
-        # self.ax1.set_xlim(0, self.window_size)
         self.ax1.set_xlim(0, 1)
         self.ax1.set_title('Real-time Vibration Data')
         self.ax1.set_xlabel('Time')
@@ -116,45 +117,46 @@ class VibrationFFTApp(QMainWindow):
         self.freq_label = QLabel(self)
         self.layout.addWidget(self.freq_label)
 
-    def get_newdata(self):
-        if self.ser.in_waiting > 0:
-            # print("readline:", self.ser.readline())
-            try:
-                line = self.ser.readline().decode('utf-8').rstrip()
-                return float(line)
-            except UnicodeDecodeError:
-                print("UnicodeDecodeError: invalid byte sequence")
-                return 0.0
-            except ValueError:
-                print("ValueError: could not convert string to float")
-                return 0.0
-        return 0.0
 
     def update_plot(self):
-        new_value = self.get_newdata()
-        print("new_value is:", new_value)
+        bytes_waiting = self.ser.in_waiting
+        # print(bytes_waiting)
+        if bytes_waiting > 0:
+            try:
+                line = self.ser.readline().decode('utf-8').rstrip()
+                new_value = float(line)
+            except UnicodeDecodeError:
+                print("UnicodeDecodeError: invalid byte sequence")
+                new_value = 0.0
+            except ValueError:
+                print("ValueError: could not convert string to float")
+                new_value = 0.0
+        else:
+            new_value = 0
+
+        # 去除异常数值
+        if self.data[-1] != 0 and abs(new_value - self.data[-1]) > 10:
+            self.counter += 1
+            return ;
+
         # 更新实时显示数据
         self.data = np.roll(self.data, -1)
         self.data[-1] = new_value
-    
+
+        self.line1.set_ydata(self.data)
+        self.canvas1.draw()
+
+        # 每5次更新一次FFT图表
+        if self.counter % 3 == 0:
+            self.fft_result = np.abs(np.fft.fft(self.fft_data)[:self.fft_size // 2])
+            self.line2.set_ydata(self.fft_result)
+            self.canvas2.draw()
+
         # 更新FFT数据
         self.fft_data = np.roll(self.fft_data, -1)
         self.fft_data[-1] = new_value
 
-        # 计算FFT
-        self.fft_result = np.abs(np.fft.fft(self.fft_data)[:self.fft_size // 2])
-        # 更新图表数据
-        self.line1.set_ydata(self.data)
-        self.line2.set_ydata(self.fft_result)
-
-        self.canvas1.draw()
-        self.canvas2.draw()
-
-        # 找到频率峰值并更新标签
-        # peaks, _ = find_peaks(self.fft_result, height=100)
-        # peak_frequencies = self.frequencies[peaks]
-        # peak_info = ", ".join([f"{freq:.2f} Hz" for freq in peak_frequencies])
-        # self.freq_label.setText(f'Peak Frequencies: {peak_info}')
+        self.counter += 1
 
 
 if __name__ == '__main__':

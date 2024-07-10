@@ -5,14 +5,14 @@ import matplotlib.animation as animation
 import serial
 
 # 采样频率3KHz，每秒3000个数据点
-sampling_rate = 3000
+sampling_rate = 50
 # 每次更新动画的间隔时间为1毫秒（1000 Hz）
-update_interval = 1
+update_interval = 2
 
 def main():
     try:
         # 替换为你的串口端口和波特率
-        ser = serial.Serial('/dev/ttyACM0', 921600)
+        ser = serial.Serial('/dev/ttyACM0', 57600)
         ser.flush()
     except serial.SerialException as e:
         print(f"Could not open serial port: {e}")
@@ -30,7 +30,8 @@ def main():
     ax1.set_xlabel('Time (s)')
     ax1.set_ylabel('Distance')
     ax1.set_title('Real-time Distance Data')
-    ax1.set_ylim(35.4, 35.8)  # 设置y轴的范围，根据实际需要调整
+    # ax1.set_ylim(35.4, 35.8)  # 设置y轴的范围，根据实际需要调整
+    ax1.set_ylim(20, 45)  # 设置y轴的范围，根据实际需要调整
 
     ax2.set_xlabel('Frequency (Hz)')
     ax2.set_ylabel('Magnitude')
@@ -45,6 +46,7 @@ def main():
         nonlocal ys
         try:
             for i in range(sampling_rate):
+                print(ser.in_waiting)
                 if ser.in_waiting > 0:
                     data_line = ser.readline().decode('utf-8').rstrip()
                     distance = float(data_line)
