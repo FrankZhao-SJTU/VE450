@@ -9,7 +9,8 @@ const float distanceMax = 45.0;
 
 void setup() {
   // 初始化串口通信
-  Serial.begin(921600);  // 使用更高的波特率，以提高串口通信速度
+  // Serial.begin(921600);  // 使用更高的波特率，以提高串口通信速度
+  Serial.begin(57600);
 }
 
 void loop() {
@@ -31,7 +32,7 @@ void loop() {
   Serial.println(distance, 5);
   
   // 延迟最小时间以获得最高采样频率
-  // delay(1);  // 可选：使用最小的延迟时间
+  delay(60);  // 可选：使用最小的延迟时间
 }
 
 // 自定义map函数，将输入值从一个范围映射到另一个范围
