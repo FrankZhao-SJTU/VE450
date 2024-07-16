@@ -12,7 +12,7 @@ update_interval = 2
 def main():
     try:
         # 替换为你的串口端口和波特率
-        ser = serial.Serial('/dev/ttyACM0', 57600)
+        ser = serial.Serial('com5', 57600)
         ser.flush()
     except serial.SerialException as e:
         print(f"Could not open serial port: {e}")
