@@ -208,7 +208,6 @@ class VibrationFFTApp(QMainWindow):
             self.fft_result = np.zeros(self.fft_size // 2)
             self.data_storage = []
             self.fft_result_all = np.zeros(self.fft_size // 2)
-            self.t = 0
             self.sampling_started = True
             self.initUI()
             self.timer.start(self.update_interval_ms)
@@ -216,13 +215,7 @@ class VibrationFFTApp(QMainWindow):
             self.ser.reset_input_buffer()
         
     
-    
-    def get_new_value(self):
-        return (20+np.random.randn())*np.sin(2*np.pi*10*self.t) + (20+np.random.randn())*np.cos(2*np.pi*15*self.t) + np.random.randn()
-
-
     def update_plot(self):
-        # new_value = self.get_new_value()
         bytes_waiting = self.ser.in_waiting
         print(bytes_waiting)
         if bytes_waiting > 0:
@@ -243,8 +236,6 @@ class VibrationFFTApp(QMainWindow):
         if self.data[-1] != 0 and abs(new_value - self.data[-1]) > 10:
             self.counter += 1
             return ;
-        # self.data_storage.append(new_value)
-        # self.t += 0.02
 
         # 更新实时显示数据
         self.data = np.roll(self.data, -1)
