@@ -2,7 +2,8 @@ import sys
 import numpy as np
 from scipy.signal import find_peaks
 from scipy.interpolate import interp1d
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QGridLayout, QFileDialog, QScrollArea
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, \
+    QGridLayout, QFileDialog, QScrollArea, QSizePolicy
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QPixmap, QFont
 import matplotlib.pyplot as plt
@@ -42,15 +43,6 @@ class VibrationFFTApp(QMainWindow):
         self.fft_data = np.zeros(self.fft_size)
         self.fft_result = np.zeros(self.fft_size // 2)
         self.initUI()
-
-        # 初始化串口通信
-        try:
-            self.ser = serial.Serial('COM5', 57600, timeout=0.01)  # 设置合理的波特率
-            self.ser.flush()
-        except serial.SerialException as e:
-            print(f"Could not open serial port: {e}")
-            sys.exit(1)
-        print("Starting to read from serial port...")
 
 
 
@@ -212,39 +204,22 @@ class VibrationFFTApp(QMainWindow):
             self.sampling_started = True
             self.initUI()
             self.timer.start(self.update_interval_ms)
+            # 初始化计数器
             self.counter = 0
-            self.ser.reset_input_buffer()
+            # self.ser.reset_input_buffer()
         
     
     
     def get_new_value(self):
-        return (20+np.random.randn())*np.sin(2*np.pi*10*self.t) + (20+np.random.randn())*np.cos(2*np.pi*15*self.t) + np.random.randn()
+        # return (20+np.random.randn())*np.sin(2*np.pi*10*self.t) + (20+np.random.randn())*np.cos(2*np.pi*15*self.t) + np.random.randn()
+        return 30 + 10*np.sin(2*np.pi*10*self.t)
 
 
     def update_plot(self):
-        # new_value = self.get_new_value()
-        bytes_waiting = self.ser.in_waiting
-        print(bytes_waiting)
-        if bytes_waiting > 0:
-            try:
-                line = self.ser.readline().decode('utf-8').rstrip()
-                new_value = float(line)
-                self.data_storage.append(new_value)
-            except UnicodeDecodeError:
-                print("UnicodeDecodeError: invalid byte sequence")
-                new_value = 0.0
-            except ValueError:
-                print("ValueError: could not convert string to float")
-                new_value = 0.0
-        else:
-            new_value = 0
+        new_value = self.get_new_value()
+        self.data_storage.append(new_value)
+        self.t += 0.03
 
-        # 去除异常数值
-        if self.data[-1] != 0 and abs(new_value - self.data[-1]) > 10:
-            self.counter += 1
-            return ;
-        # self.data_storage.append(new_value)
-        # self.t += 0.02
 
         # 更新实时显示数据
         self.data = np.roll(self.data, -1)
