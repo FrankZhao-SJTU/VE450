@@ -275,7 +275,11 @@ class VibrationFFTApp(QMainWindow):
 
         # 在所有数据上进行FFT
         self.all_data_array = np.array(self.data_storage)
-        self.fft_result_all = np.abs(np.fft.fft(self.all_data_array, n=self.fft_size)[:self.fft_size // 2])
+        fft_result = np.fft.fft(self.all_data_array)
+        frequencies = np.fft.fftfreq(len(self.all_data_array), d=1/self.sampling_rate)
+        positive_frequencies = frequencies[:len(self.all_data_array)//2]
+        positive_fft_result = np.abs(fft_result[:len(self.all_data_array)//2])
+        print(positive_frequencies)
         # messages.append(HumanMessage(content=f"sample rate: {self.sampling_rate} \
         #     measured distance: {self.all_data_array}. After FFT, we get frequency: {self.frequencies} and\
         #     amplitude: {self.fft_result_all}"))
@@ -290,7 +294,7 @@ class VibrationFFTApp(QMainWindow):
         self.ax2.set_xlabel('Frequency (Hz)', fontsize=14)
         self.ax2.set_ylabel('Magnitude', fontsize=16)
         self.ax2.tick_params(axis='both', which='major', labelsize=12)
-        self.ax2.plot(self.frequencies, self.fft_result_all)
+        self.ax2.plot(positive_frequencies, positive_fft_result)
         self.canvas2.draw()  # 更新canvas2
 
         # 确保布局中添加了更新后的图像
