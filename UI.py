@@ -31,7 +31,7 @@ class VibrationFFTApp(QMainWindow):
         self.fft_size = 32
         self.update_interval_ms = 0
         self.frequencies = np.fft.fftfreq(self.fft_size, 1 / self.sampling_rate)[:self.fft_size // 2]
-        print("FFT Frequencies:", self.frequencies)
+        # print("FFT Frequencies:", self.frequencies)
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_plot)
         self.distance_range = (20,45)
@@ -209,15 +209,15 @@ class VibrationFFTApp(QMainWindow):
             self.data_storage = []
             self.fft_result_all = np.zeros(self.fft_size // 2)
             self.sampling_started = True
-            self.initUI()
-            self.timer.start(self.update_interval_ms)
             self.counter = 0
+            self.initUI()
             self.ser.reset_input_buffer()
+            self.timer.start(self.update_interval_ms)
         
     
     def update_plot(self):
         bytes_waiting = self.ser.in_waiting
-        print(bytes_waiting)
+        # print(bytes_waiting)
         if bytes_waiting > 0:
             try:
                 line = self.ser.readline().decode('utf-8').rstrip()
@@ -274,11 +274,8 @@ class VibrationFFTApp(QMainWindow):
 
 
     def plot_final_data(self):
-        # 创建插值对象
-        x = np.linspace(0, self.stop_time, len(self.data_storage))
-
-        # 更新位移图像并绘制平滑曲线
         self.ax1.clear()
+        x = np.linspace(0, self.stop_time, len(self.data_storage))
         self.ax1.plot(x, self.data_storage)
         self.ax1.set_ylim(self.distance_range)
         self.ax1.set_title(f"Displacement over {self.stop_time:.2f} seconds", fontsize=18)
@@ -292,7 +289,7 @@ class VibrationFFTApp(QMainWindow):
         frequencies = np.fft.fftfreq(len(self.all_data_array), d=1/self.sampling_rate)
         positive_frequencies = frequencies[:len(self.all_data_array)//2]
         positive_fft_result = np.abs(fft_result[:len(self.all_data_array)//2])
-        print(positive_frequencies)
+        # print(positive_frequencies)
         # messages.append(HumanMessage(content=f"sample rate: {self.sampling_rate} \
         #     measured distance: {self.all_data_array}. After FFT, we get frequency: {self.frequencies} and\
         #     amplitude: {self.fft_result_all}"))

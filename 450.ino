@@ -1,5 +1,5 @@
 // 定义模拟输入引脚
-const int analogPin = A0;
+const int analogPin = A1;
 
 // 定义电压和距离的对应关系
 const float voltageMin = 0.0;
@@ -32,7 +32,7 @@ void loop() {
   Serial.println(distance, 5);
   
   // 延迟最小时间以获得最高采样频率
-  delay(33);  // 可选：使用最小的延迟时间
+  delay(33.33);  // 可选：使用最小的延迟时间
 }
 
 // 自定义map函数，将输入值从一个范围映射到另一个范围
