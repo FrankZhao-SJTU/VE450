@@ -276,13 +276,10 @@ class VibrationFFTApp(QMainWindow):
     def plot_final_data(self):
         # 创建插值对象
         x = np.linspace(0, self.stop_time, len(self.data_storage))
-        f = interp1d(x, self.data_storage, kind='cubic')
-        x_new = np.linspace(0, self.stop_time, 500)
-        y_new = f(x_new)
 
         # 更新位移图像并绘制平滑曲线
         self.ax1.clear()
-        self.ax1.plot(x_new, y_new)
+        self.ax1.plot(x, self.data_storage)
         self.ax1.set_ylim(self.distance_range)
         self.ax1.set_title(f"Displacement over {self.stop_time:.2f} seconds", fontsize=18)
         self.ax1.set_ylabel("Displacement", fontsize=16)
@@ -291,7 +288,11 @@ class VibrationFFTApp(QMainWindow):
 
         # 在所有数据上进行FFT
         self.all_data_array = np.array(self.data_storage)
-        self.fft_result_all = np.abs(np.fft.fft(self.all_data_array, n=self.fft_size)[:self.fft_size // 2])
+        fft_result = np.fft.fft(self.all_data_array)
+        frequencies = np.fft.fftfreq(len(self.all_data_array), d=1/self.sampling_rate)
+        positive_frequencies = frequencies[:len(self.all_data_array)//2]
+        positive_fft_result = np.abs(fft_result[:len(self.all_data_array)//2])
+        print(positive_frequencies)
         # messages.append(HumanMessage(content=f"sample rate: {self.sampling_rate} \
         #     measured distance: {self.all_data_array}. After FFT, we get frequency: {self.frequencies} and\
         #     amplitude: {self.fft_result_all}"))
@@ -306,8 +307,9 @@ class VibrationFFTApp(QMainWindow):
         self.ax2.set_xlabel('Frequency (Hz)', fontsize=14)
         self.ax2.set_ylabel('Magnitude', fontsize=16)
         self.ax2.tick_params(axis='both', which='major', labelsize=12)
-        self.ax2.plot(self.frequencies, self.fft_result_all)
+        self.ax2.plot(positive_frequencies, positive_fft_result)
         self.canvas2.draw()  # 更新canvas2
+
 
         # 确保布局中添加了更新后的图像
         self.left_layout.update()

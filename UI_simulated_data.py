@@ -260,13 +260,14 @@ class VibrationFFTApp(QMainWindow):
     def plot_final_data(self):
         # 创建插值对象
         x = np.linspace(0, self.stop_time, len(self.data_storage))
-        f = interp1d(x, self.data_storage, kind='cubic')
-        x_new = np.linspace(0, self.stop_time, 500)
-        y_new = f(x_new)
+        # f = interp1d(x, self.data_storage, kind='cubic')
+        # x_new = np.linspace(0, self.stop_time, 500)
+        # y_new = f(x_new)
 
         # 更新位移图像并绘制平滑曲线
         self.ax1.clear()
-        self.ax1.plot(x_new, y_new)
+        # self.ax1.plot(x_new, y_new)
+        self.ax1.plot(x, self.data_storage)
         self.ax1.set_ylim(self.distance_range)
         self.ax1.set_title(f"Displacement over {self.stop_time:.2f} seconds", fontsize=18)
         self.ax1.set_ylabel("Displacement", fontsize=16)
