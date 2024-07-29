@@ -9,9 +9,10 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import time
 import csv
+from scipy.signal import savgol_filter, find_peaks
 from datetime import datetime
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+# from langchain_openai import ChatOpenAI
+# from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 import os
 import serial
 
@@ -35,9 +36,9 @@ class VibrationFFTApp(QMainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_plot)
         self.distance_range = (20,45)
-        self.FFT_magnitude_range = (0, 500)
+        self.FFT_magnitude_range = (0, 15)
         self.FFT_frequency_range = (0, self.sampling_rate // 2) 
-        self.threshold = 10  # 设置FFT振幅的阈值
+        self.threshold = 1  # 设置FFT振幅的阈值
         self.data = np.zeros(self.window_size)
         self.fft_data = np.zeros(self.fft_size)
         self.fft_result = np.zeros(self.fft_size // 2)
@@ -45,7 +46,7 @@ class VibrationFFTApp(QMainWindow):
 
         # 初始化串口通信
         try:
-            self.ser = serial.Serial('COM5', 57600, timeout=0.01)  # 设置合理的波特率
+            self.ser = serial.Serial('COM3', 57600, timeout=0.01)  # 设置合理的波特率
             self.ser.flush()
         except serial.SerialException as e:
             print(f"Could not open serial port: {e}")
@@ -252,8 +253,9 @@ class VibrationFFTApp(QMainWindow):
 
             # 找到超过阈值的峰值频率并更新标签
             peak_indices, _ = find_peaks(self.fft_result, height=self.threshold)
-            peak_freqs = self.frequencies[peak_indices]
-            peak_info = '\n'.join([f"Peak Frequency: {freq:.2f} Hz" for freq in peak_freqs])
+            # peak_freqs = self.frequencies[peak_indices]
+            # peak_info = '\n'.join([f"Peak Frequency: {freq:.2f} Hz" for freq in peak_freqs])
+            peak_info = '\n'.join([f"Peak Frequency: {self.frequencies[indices]:.2f} Hz, corresponding amplitude: {self.fft_result[indices]}" for indices in peak_indices])
             self.solution_label.setText(f"{peak_info}\n")
 
         # 更新FFT数据
@@ -289,6 +291,29 @@ class VibrationFFTApp(QMainWindow):
         frequencies = np.fft.fftfreq(len(self.all_data_array), d=1/self.sampling_rate)
         positive_frequencies = frequencies[:len(self.all_data_array)//2]
         positive_fft_result = np.abs(fft_result[:len(self.all_data_array)//2])
+
+        # peak_info = '\n'.join([f"Peak Frequency: {self.frequencies[indices]:.2f} Hz, corresponding amplitude: {self.fft_result[indices]}" for indices in peak_indices])
+        # window_length = 13
+        # polyorder = 2
+        # smoothed_fft_result = savgol_filter(positive_fft_result, window_length=window_length, polyorder=polyorder)
+        # 手动设置噪声的最大频率，然后找到三个频率峰值，noise_freq可调节
+        noise_freq = 3
+        non_noise_min_index = next((i for i, freq in enumerate(positive_frequencies) if freq > noise_freq), None)
+        if non_noise_min_index is None:
+            raise ValueError("No frequencies found above the noise frequency threshold")
+
+        peaks, _ = find_peaks(positive_fft_result[non_noise_min_index:])
+
+        # 根据振幅大小对峰值进行排序，并选择振幅最大的三个峰值
+        peak_freq_num = 3
+        sorted_peaks = sorted(peaks, key=lambda x: positive_fft_result[non_noise_min_index + x], reverse=True)
+        top_peaks = sorted_peaks[:peak_freq_num]
+        peak_frequencies = positive_frequencies[non_noise_min_index:][top_peaks]
+        peak_amplitudes = positive_fft_result[non_noise_min_index:][top_peaks]
+        # print(f"Top {peak_freq_num} peak frequencies:", peak_frequencies)
+        # print(f"Top {peak_freq_num} peak amplitudes:", peak_amplitudes)
+        self.solution_label.setText(f"Top {peak_freq_num} peak frequencies:{peak_frequencies}\nTop {peak_freq_num} peak amplitudes:{peak_amplitudes}")
+        # self.solution_label.setText(f"{peak_info}\n")
         # print(positive_frequencies)
         # messages.append(HumanMessage(content=f"sample rate: {self.sampling_rate} \
         #     measured distance: {self.all_data_array}. After FFT, we get frequency: {self.frequencies} and\
