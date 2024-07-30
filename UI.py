@@ -274,7 +274,8 @@ class VibrationFFTApp(QMainWindow):
 
             # 找到超过阈值的峰值频率并更新标签
             peak_indices, _ = find_peaks(self.fft_result)
-            peak_info = '\n'.join([f"Peak Frequency: {self.frequencies[indices]:.2f} Hz, corresponding amplitude: {self.fft_result[indices]}" for indices in peak_indices])
+            peak_info = "Peak Frequency:\n"
+            peak_info += '\n'.join([f"{self.frequencies[indices]:.2f} Hz: {self.fft_result[indices]:2f}" for indices in peak_indices])
             self.solution_label.setText(f"{peak_info}\n")
 
         self.counter += 1
