@@ -173,7 +173,6 @@ class VibrationFFTApp(QMainWindow):
         self.right_layout.setAlignment(Qt.AlignTop)  # 设置右侧布局的对齐方式
 
         sol_font = QFont("Arial", 12)  # 设置字体为Arial，大小12
-        # self.solution_label = QLabel("These are temporary words and will be replaced later. ..."*50, self)
         self.solution_label = QLabel("", self)
         self.solution_label.setWordWrap(True)  # 自动换行
         self.solution_label.setAlignment(Qt.AlignTop)
@@ -184,11 +183,26 @@ class VibrationFFTApp(QMainWindow):
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.right_layout.addWidget(self.scroll_area, alignment=Qt.AlignTop)
-        self.scroll_area.setFixedSize(550, 650)
+        self.scroll_area.setFixedSize(550, 300)
         # 将 QLabel 设置为 QScrollArea 的小部件
         self.scroll_area.setWidget(self.solution_label)
         
+        
+        sol_font = QFont("Arial", 12)  # 设置字体为Arial，大小12
+        self.analysis = QLabel("", self)
+        self.analysis.setWordWrap(True)  # 自动换行
+        self.analysis.setAlignment(Qt.AlignTop)
+        self.analysis.setFont(sol_font)
+        self.analysis.setStyleSheet("QLabel { padding: 10px; border: 1px solid #ddd; background-color: #fff; }")
 
+        # 创建 QScrollArea
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.right_layout.addWidget(self.scroll_area, alignment=Qt.AlignTop)
+        self.scroll_area.setFixedSize(550, 450)
+        # 将 QLabel 设置为 QScrollArea 的小部件
+        self.scroll_area.setWidget(self.analysis)
+        
         # 创建按钮布局
         button_layout = QGridLayout()
 
@@ -296,6 +310,19 @@ class VibrationFFTApp(QMainWindow):
 
 
     def plot_final_data(self):
+        analysis_result = """Relationship Between Fixture, U-shaped Middle Width, Input Pressure, and Amplitude
+Model Fit: The R-squared value is 0.753, indicating that about 75.3% of the variance in Amplitude is explained by the model.
+Fixture: The p-value for the fixture type is 0.435, suggesting that the difference between fixed and unfixed fixtures is not statistically significant for amplitude.
+U-shaped Middle Width (mm): The p-value is 0.003, indicating a statistically significant relationship with amplitude.
+Input Pressure (bars): The p-value is 0.002, also indicating a statistically significant effect on amplitude.
+
+Relationship Between Fixture, U-shaped Middle Width, Input Pressure, and Frequency
+Model Fit: The R-squared value is 0.160, meaning only 16% of the variance in Frequency is explained by this model, which is quite low.
+Fixture: The p-value is 0.574, suggesting no statistically significant difference in frequency due to the fixture type.
+U-shaped Middle Width (mm): The p-value is 0.531, indicating that the middle width does not significantly affect the frequency.
+Input Pressure (bars): The p-value is 0.239, also suggesting no significant effect on frequency.
+        """
+        self.analysis.setText(analysis_result)
         print("plot final distance data")
         final_box_text = ""
         self.ax1.clear()
@@ -397,8 +424,9 @@ class VibrationFFTApp(QMainWindow):
                 self.fig2.savefig(fft_image_path)
 
                 # 获取文本框内容
-                text_content = self.solution_label.text()
-
+                text1 = self.solution_label.text()
+                text2 = self.analysis.text()
+                
                 # 生成HTML内容
                 html_content = f"""
                 <html>
@@ -411,8 +439,10 @@ class VibrationFFTApp(QMainWindow):
                     <img src="{distance_image_path}" alt="Distance Plot">
                     <h2>FFT Result</h2>
                     <img src="{fft_image_path}" alt="FFT Plot">
-                    <h2>Text Content</h2>
-                    <p>{text_content}</p>
+                    <h2>Text Box 1</h2>
+                    <p>{text1}</p>
+                    <h2>Text Box 2</h2>
+                    <p>{text2}</p>           
                 </body>
                 </html>
                 """
