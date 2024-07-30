@@ -11,51 +11,87 @@ import time
 import csv
 from scipy.signal import savgol_filter, find_peaks
 from datetime import datetime
-# from langchain_openai import ChatOpenAI
-# from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 import os
 import serial
+import threading
 
-# model = ChatOpenAI(model="gpt-3.5-turbo", api_key=os.environ["OPENAI_API_KEY"])
-# messages = [SystemMessage(content="I am conducting vibration analysis. \
-#     Analysis the measured displacement and FFT results. Describe the \
-#     vibration amplitude and frequency. The unit of measured distance is \
-#     mm. The unit of frequency is Hz. Ouput format: only the description."),]
+class SerialReader:
+    def __init__(self, port, baudrate):
+        self.port = port
+        self.baudrate = baudrate
+        self.ser = None
+        self.read_thread = None
+        self.stop_event = threading.Event()
 
-
-class VibrationFFTApp(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.sampling_started = False
-        self.sampling_rate = 30
-        self.window_size = 30 
-        self.fft_size = 32
-        self.update_interval_ms = 0
-        self.frequencies = np.fft.fftfreq(self.fft_size, 1 / self.sampling_rate)[:self.fft_size // 2]
-        # print("FFT Frequencies:", self.frequencies)
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_plot)
-        self.distance_range = (20,45)
-        self.FFT_magnitude_range = (0, 15)
-        self.FFT_frequency_range = (0, self.sampling_rate // 2) 
-        self.threshold = 1  # 设置FFT振幅的阈值
-        self.data = np.zeros(self.window_size)
-        self.fft_data = np.zeros(self.fft_size)
-        self.fft_result = np.zeros(self.fft_size // 2)
-        self.initUI()
-
-        # 初始化串口通信
+    def init_serial(self):
         try:
-            self.ser = serial.Serial('COM3', 57600, timeout=0.01)  # 设置合理的波特率
+            self.ser = serial.Serial(self.port, self.baudrate, timeout=0.01)  # 设置合理的波特率
             self.ser.flush()
         except serial.SerialException as e:
             print(f"Could not open serial port: {e}")
             sys.exit(1)
         print("Starting to read from serial port...")
 
+    def read_from_serial(self):
+        while not self.stop_event.is_set():
+            if self.ser.in_waiting > 0:
+                try:
+                    line = self.ser.readline().decode('utf-8').rstrip()
+                    new_value = float(line)
+                except UnicodeDecodeError:
+                    print("UnicodeDecodeError: invalid byte sequence")
+                    new_value = 0.0
+                except ValueError:
+                    print("ValueError: could not convert string to float")
+                    new_value = 0.0
+                # print("new value:", new_value)
+                return new_value
+
+    def start_receiving(self):
+        self.stop_event.clear()
+        self.ser.reset_input_buffer()  # 清除串口输入缓冲区中的所有数据
+        self.read_thread = threading.Thread(target=self.read_from_serial)
+        self.read_thread.start()
+        print("Reading thread started.")
+
+    def stop_receiving(self):
+        self.stop_event.set()
+        self.read_thread.join()
+        print("Reading thread stopped.")
+
+    def close_serial(self):
+        if self.ser:
+            self.ser.close()
+        print("Serial port closed.")
+
+        
+
+class VibrationFFTApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.sampling_started = False
+        self.sampling_rate = 30
+        self.window_size = 32
+        self.fft_size = 32
+        self.update_interval_us = 0
+        self.frequencies = np.fft.fftfreq(self.fft_size, 1 / self.sampling_rate)[:self.fft_size // 2]
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_plot)
+        self.distance_range = (20,45)
+        self.FFT_magnitude_range = (0, 200)
+        self.FFT_frequency_range = (0, self.sampling_rate // 2) 
+        self.data = np.zeros(self.window_size)
+        self.fft_result = np.zeros(self.fft_size // 2)
+        self.data_storage = []
+        self.counter = 0
+        self.port = 'COM5'  # 替换为实际的串口端口
+        self.baudrate = 57600
+        self.initUI()
+
 
 
     def initUI(self):
+        print("Start initUI...")
         self.setWindowTitle('SU24 ECE/ME/MSE450 Group24: Vibration Detection and Analysis System')
 
         # 设置固定窗口大小
@@ -103,7 +139,7 @@ class VibrationFFTApp(QMainWindow):
         self.left_layout.setAlignment(Qt.AlignTop)  # 设置左侧布局的对齐方式
 
         # 创建振动数据图
-        xs = np.linspace(0, 1, self.window_size)  # x轴时间点
+        xs = np.linspace(0, self.window_size/self.sampling_rate, self.window_size)  # x轴时间点
         self.fig1, self.ax1 = plt.subplots()
         self.ax1.set_ylim(self.distance_range)
         self.ax1.set_xlim(0, 1)
@@ -137,7 +173,8 @@ class VibrationFFTApp(QMainWindow):
         self.right_layout.setAlignment(Qt.AlignTop)  # 设置右侧布局的对齐方式
 
         sol_font = QFont("Arial", 12)  # 设置字体为Arial，大小12
-        self.solution_label = QLabel("These are temporary words and will be replaced later. ..."*50, self)
+        # self.solution_label = QLabel("These are temporary words and will be replaced later. ..."*50, self)
+        self.solution_label = QLabel("", self)
         self.solution_label.setWordWrap(True)  # 自动换行
         self.solution_label.setAlignment(Qt.AlignTop)
         self.solution_label.setFont(sol_font)
@@ -200,44 +237,28 @@ class VibrationFFTApp(QMainWindow):
         # 将右侧布局添加到主布局中
         self.main_layout.addLayout(self.right_layout)
 
-    
+    def fresh(self):
+        self.data = np.zeros(self.window_size)
+        self.fft_result = np.zeros(self.fft_size // 2)
+        self.data_storage = []
+        self.counter = 0
+
     def start_sampling(self):
         if self.sampling_started == False:
-            self.start_time = time.time()  # 开始时间
-            self.data = np.zeros(self.window_size)
-            self.fft_data = np.zeros(self.fft_size)
-            self.fft_result = np.zeros(self.fft_size // 2)
-            self.data_storage = []
-            self.fft_result_all = np.zeros(self.fft_size // 2)
+            self.fresh()
+            self.initUI()  # 重新初始化UI
             self.sampling_started = True
-            self.counter = 0
-            self.initUI()
-            self.ser.reset_input_buffer()
-            self.timer.start(self.update_interval_ms)
+            self.serial_reader = SerialReader(self.port, self.baudrate)
+            self.serial_reader.init_serial()
+            self.start_time = time.time()
+            self.serial_reader.start_receiving()
+            self.timer.start(self.update_interval_us)
         
     
     def update_plot(self):
-        bytes_waiting = self.ser.in_waiting
-        # print(bytes_waiting)
-        if bytes_waiting > 0:
-            try:
-                line = self.ser.readline().decode('utf-8').rstrip()
-                new_value = float(line)
-                self.data_storage.append(new_value)
-            except UnicodeDecodeError:
-                print("UnicodeDecodeError: invalid byte sequence")
-                new_value = 0.0
-            except ValueError:
-                print("ValueError: could not convert string to float")
-                new_value = 0.0
-        else:
-            new_value = 0
-
-        # 去除异常数值
-        if self.data[-1] != 0 and abs(new_value - self.data[-1]) > 10:
-            self.counter += 1
-            return ;
-
+        new_value = self.serial_reader.read_from_serial()
+        self.data_storage.append(new_value)
+        
         # 更新实时显示数据
         self.data = np.roll(self.data, -1)
         self.data[-1] = new_value
@@ -246,36 +267,36 @@ class VibrationFFTApp(QMainWindow):
         self.canvas1.draw()
 
         # 每3次更新一次FFT图表
-        if self.counter % 3 == 0:
-            self.fft_result = np.abs(np.fft.fft(self.fft_data)[:self.fft_size // 2])
+        if self.counter > 31 and self.counter % 5 == 0:
+            self.fft_result = np.abs(np.fft.fft(self.data)[:self.fft_size // 2])
             self.line2.set_ydata(self.fft_result)
             self.canvas2.draw()
 
             # 找到超过阈值的峰值频率并更新标签
-            peak_indices, _ = find_peaks(self.fft_result, height=self.threshold)
-            # peak_freqs = self.frequencies[peak_indices]
-            # peak_info = '\n'.join([f"Peak Frequency: {freq:.2f} Hz" for freq in peak_freqs])
+            peak_indices, _ = find_peaks(self.fft_result)
             peak_info = '\n'.join([f"Peak Frequency: {self.frequencies[indices]:.2f} Hz, corresponding amplitude: {self.fft_result[indices]}" for indices in peak_indices])
             self.solution_label.setText(f"{peak_info}\n")
-
-        # 更新FFT数据
-        self.fft_data = np.roll(self.fft_data, -1)
-        self.fft_data[-1] = new_value
 
         self.counter += 1
         
 
 
+
     def stop_update(self):
         if self.sampling_started == True:
             self.timer.stop()
+            self.serial_reader.stop_receiving()
+            self.serial_reader.close_serial()
             self.sampling_started = False  # 标志停止采样
             self.stop_time = time.time() - self.start_time  # 获取停止时间
             self.plot_final_data()
+           
             
 
 
     def plot_final_data(self):
+        print("plot final distance data")
+        final_box_text = ""
         self.ax1.clear()
         x = np.linspace(0, self.stop_time, len(self.data_storage))
         self.ax1.plot(x, self.data_storage)
@@ -284,42 +305,44 @@ class VibrationFFTApp(QMainWindow):
         self.ax1.set_ylabel("Displacement", fontsize=16)
         self.ax1.tick_params(axis='both', which='major', labelsize=12)
         self.canvas1.draw()  # 更新canvas1
+        final_box_text += f"Distance Range:\n{min(self.data_storage)}mm ~ {max(self.data_storage)}mm\n"
 
         # 在所有数据上进行FFT
-        self.all_data_array = np.array(self.data_storage)
-        fft_result = np.fft.fft(self.all_data_array)
-        frequencies = np.fft.fftfreq(len(self.all_data_array), d=1/self.sampling_rate)
-        positive_frequencies = frequencies[:len(self.all_data_array)//2]
-        positive_fft_result = np.abs(fft_result[:len(self.all_data_array)//2])
+        print("plot final FFT result")
+        all_data_array = np.array(self.data_storage)
+        fft_result = np.fft.fft(all_data_array)
+        frequencies = np.fft.fftfreq(len(all_data_array), d=1/self.sampling_rate)
+        positive_frequencies = frequencies[:len(all_data_array)//2]
+        positive_fft_result = np.abs(fft_result[:len(all_data_array)//2])
 
-        # peak_info = '\n'.join([f"Peak Frequency: {self.frequencies[indices]:.2f} Hz, corresponding amplitude: {self.fft_result[indices]}" for indices in peak_indices])
-        # window_length = 13
-        # polyorder = 2
-        # smoothed_fft_result = savgol_filter(positive_fft_result, window_length=window_length, polyorder=polyorder)
+        window_length = 11
+        polyorder = 2
+        smoothed_fft_result = savgol_filter(positive_fft_result, window_length=window_length, polyorder=polyorder)
+        print("len of smoothed_fft_result = ", len(smoothed_fft_result))
         # 手动设置噪声的最大频率，然后找到三个频率峰值，noise_freq可调节
-        noise_freq = 3
+        noise_freq = 2
         non_noise_min_index = next((i for i, freq in enumerate(positive_frequencies) if freq > noise_freq), None)
         if non_noise_min_index is None:
             raise ValueError("No frequencies found above the noise frequency threshold")
 
-        peaks, _ = find_peaks(positive_fft_result[non_noise_min_index:])
+        peaks, _ = find_peaks(smoothed_fft_result[non_noise_min_index:])
 
         # 根据振幅大小对峰值进行排序，并选择振幅最大的三个峰值
         peak_freq_num = 3
-        sorted_peaks = sorted(peaks, key=lambda x: positive_fft_result[non_noise_min_index + x], reverse=True)
+        sorted_peaks = sorted(peaks, key=lambda x: smoothed_fft_result[non_noise_min_index + x], reverse=True)
         top_peaks = sorted_peaks[:peak_freq_num]
         peak_frequencies = positive_frequencies[non_noise_min_index:][top_peaks]
-        peak_amplitudes = positive_fft_result[non_noise_min_index:][top_peaks]
-        # print(f"Top {peak_freq_num} peak frequencies:", peak_frequencies)
-        # print(f"Top {peak_freq_num} peak amplitudes:", peak_amplitudes)
-        self.solution_label.setText(f"Top {peak_freq_num} peak frequencies:{peak_frequencies}\nTop {peak_freq_num} peak amplitudes:{peak_amplitudes}")
-        # self.solution_label.setText(f"{peak_info}\n")
-        # print(positive_frequencies)
-        # messages.append(HumanMessage(content=f"sample rate: {self.sampling_rate} \
-        #     measured distance: {self.all_data_array}. After FFT, we get frequency: {self.frequencies} and\
-        #     amplitude: {self.fft_result_all}"))
-        # self.solution_label.setText(f"{model.invoke(messages).content}\n")
-        
+        peak_amplitudes = smoothed_fft_result[non_noise_min_index:][top_peaks]
+        final_box_text += 'Peak Frequencies:\n'
+        for i in range(peak_freq_num):
+            final_box_text += f"{peak_frequencies[i]:.2f} Hz: {peak_amplitudes[i]:.2f}\n"
+        # self.solution_label.setText(f"Top {peak_freq_num} peak frequencies:{peak_frequencies}\nTop {peak_freq_num} peak amplitudes:{peak_amplitudes}")
+        self.solution_label.setText(final_box_text)
+        # 找到第peak_freq_num+1高的峰值
+        next_peak = sorted_peaks[peak_freq_num] if len(sorted_peaks) > peak_freq_num else None
+        next_peak_frequency = positive_frequencies[non_noise_min_index + next_peak] if next_peak is not None else None
+        next_peak_amplitude = smoothed_fft_result[non_noise_min_index + next_peak] if next_peak is not None else None
+
         
         # 更新FFT图像
         self.ax2.clear()
@@ -329,9 +352,11 @@ class VibrationFFTApp(QMainWindow):
         self.ax2.set_xlabel('Frequency (Hz)', fontsize=14)
         self.ax2.set_ylabel('Magnitude', fontsize=16)
         self.ax2.tick_params(axis='both', which='major', labelsize=12)
-        self.ax2.plot(positive_frequencies, positive_fft_result)
+        self.ax2.plot(positive_frequencies, smoothed_fft_result)
+        plt.plot(peak_frequencies, peak_amplitudes, 'ro') 
+        if next_peak is not None:
+            plt.axhline(y=next_peak_amplitude, color='g', linestyle='--', label=f'{peak_freq_num+1} Peak Amplitude ({next_peak_amplitude:.2f})')
         self.canvas2.draw()  # 更新canvas2
-
 
         # 确保布局中添加了更新后的图像
         self.left_layout.update()
