@@ -45,6 +45,8 @@ class SerialReader:
                     print("ValueError: could not convert string to float")
                     new_value = 0.0
                 # print("new value:", new_value)
+                new_value = min(new_value, 45.)
+                new_value = max(new_value, 0.)
                 return new_value
 
     def start_receiving(self):
@@ -77,7 +79,6 @@ class VibrationFFTApp(QMainWindow):
         self.frequencies = np.fft.fftfreq(self.fft_size, 1 / self.sampling_rate)[:self.fft_size // 2]
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_plot)
-        self.distance_range = (20,45)
         self.FFT_magnitude_range = (0, 200)
         self.FFT_frequency_range = (0, self.sampling_rate // 2) 
         self.data = np.zeros(self.window_size)
@@ -86,6 +87,20 @@ class VibrationFFTApp(QMainWindow):
         self.counter = 0
         self.port = 'COM5'  # 替换为实际的串口端口
         self.baudrate = 57600
+        self.serial_reader = SerialReader(self.port, self.baudrate)
+        # get distance range
+        self.serial_reader.init_serial()
+        self.serial_reader.start_receiving()
+        distances = []
+        for _ in range(10):
+            distances.append(self.serial_reader.read_from_serial())
+        self.serial_reader.stop_receiving()
+        self.serial_reader.close_serial()
+        distances_mean = sum(distances) / len(distances)
+        print(distances)
+        print("distance mean =", distances_mean)
+        # self.distance_range = (distances_mean-0.2, distances_mean+0.2)
+        self.distance_range = (20,45)
         self.initUI()
 
 
@@ -163,7 +178,6 @@ class VibrationFFTApp(QMainWindow):
         self.canvas2 = FigureCanvas(self.fig2)
         self.canvas2.setFixedSize(1100, 470)  # 固定窗口大小
         self.left_layout.addWidget(self.canvas2, alignment=Qt.AlignTop)
-
 
         # 将左侧布局添加到主布局中
         self.main_layout.addLayout(self.left_layout)
@@ -345,7 +359,8 @@ Input Pressure (bars): The p-value is 0.239, also suggesting no significant effe
 
         window_length = 11
         polyorder = 2
-        smoothed_fft_result = savgol_filter(positive_fft_result, window_length=window_length, polyorder=polyorder)
+        # smoothed_fft_result = savgol_filter(positive_fft_result, window_length=window_length, polyorder=polyorder)
+        smoothed_fft_result = positive_fft_result
         print("len of smoothed_fft_result = ", len(smoothed_fft_result))
         # 手动设置噪声的最大频率，然后找到三个频率峰值，noise_freq可调节
         noise_freq = 2
@@ -364,7 +379,6 @@ Input Pressure (bars): The p-value is 0.239, also suggesting no significant effe
         final_box_text += 'Peak Frequencies:\n'
         for i in range(peak_freq_num):
             final_box_text += f"{peak_frequencies[i]:.2f} Hz: {peak_amplitudes[i]:.2f}\n"
-        # self.solution_label.setText(f"Top {peak_freq_num} peak frequencies:{peak_frequencies}\nTop {peak_freq_num} peak amplitudes:{peak_amplitudes}")
         self.solution_label.setText(final_box_text)
         # 找到第peak_freq_num+1高的峰值
         next_peak = sorted_peaks[peak_freq_num] if len(sorted_peaks) > peak_freq_num else None
@@ -374,16 +388,16 @@ Input Pressure (bars): The p-value is 0.239, also suggesting no significant effe
         
         # 更新FFT图像
         self.ax2.clear()
-        self.ax2.set_xlim(self.FFT_frequency_range)
-        self.ax2.set_ylim(self.FFT_magnitude_range)
+        self.ax2.set_xlim(noise_freq, self.sampling_rate // 2)
+        self.ax2.set_ylim(next_peak_amplitude, max(smoothed_fft_result[non_noise_min_index:])*1.2)
         self.ax2.set_title('FFT Result on All Data', fontsize=18)
         self.ax2.set_xlabel('Frequency (Hz)', fontsize=14)
         self.ax2.set_ylabel('Magnitude', fontsize=16)
         self.ax2.tick_params(axis='both', which='major', labelsize=12)
         self.ax2.plot(positive_frequencies, smoothed_fft_result)
         plt.plot(peak_frequencies, peak_amplitudes, 'ro') 
-        if next_peak is not None:
-            plt.axhline(y=next_peak_amplitude, color='g', linestyle='--', label=f'{peak_freq_num+1} Peak Amplitude ({next_peak_amplitude:.2f})')
+        # if next_peak is not None:
+        #     plt.axhline(y=next_peak_amplitude, color='g', linestyle='--', label=f'{peak_freq_num+1} Peak Amplitude ({next_peak_amplitude:.2f})')
         self.canvas2.draw()  # 更新canvas2
 
         # 确保布局中添加了更新后的图像
