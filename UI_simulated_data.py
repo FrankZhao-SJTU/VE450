@@ -89,36 +89,63 @@ class VibrationFFTApp(QMainWindow):
         self.main_layout = QHBoxLayout(self.central_widget)
         self.main_layout.setSpacing(10)
 
+        # # 创建左侧布局
+        # self.left_layout = QVBoxLayout()
+        # self.left_layout.setAlignment(Qt.AlignTop)  # 设置左侧布局的对齐方式
+
+        # # 创建振动数据图
+        # xs = np.linspace(0, 1, self.window_size)  # x轴时间点
+        # self.fig1, self.ax1 = plt.subplots()
+        # self.ax1.set_ylim(self.distance_range)
+        # self.ax1.set_xlim(0, 1)
+        # self.ax1.set_title('Real-time Vibration Data', fontsize=18)
+        # self.ax1.set_ylabel('Amplitude', fontsize=16)
+        # self.ax1.tick_params(axis='both', which='major', labelsize=12)
+        # self.line1, = self.ax1.plot(xs, self.data)
+        # self.canvas1 = FigureCanvas(self.fig1)
+        # self.canvas1.setFixedSize(1100, 480)  # 固定窗口大小
+        # self.left_layout.addWidget(self.canvas1, alignment=Qt.AlignTop)
+
+        # # 创建FFT结果图
+        # self.fig2, self.ax2 = plt.subplots()
+        # self.ax2.set_xlim(self.FFT_frequency_range)
+        # self.ax2.set_ylim(self.FFT_magnitude_range)
+        # self.ax2.set_title('Real-time FFT Result', fontsize=18)
+        # self.ax2.set_xlabel('Frequency (Hz)', fontsize=14)
+        # self.ax2.set_ylabel('Magnitude', fontsize=16)
+        # self.ax2.tick_params(axis='both', which='major', labelsize=12)
+        # self.line2, = self.ax2.plot(self.frequencies, self.fft_result)
+        # self.canvas2 = FigureCanvas(self.fig2)
+        # self.canvas2.setFixedSize(1100, 470)  # 固定窗口大小
+        # self.left_layout.addWidget(self.canvas2, alignment=Qt.AlignTop)
+
+
+        # # 将左侧布局添加到主布局中
+        # self.main_layout.addLayout(self.left_layout)
         # 创建左侧布局
         self.left_layout = QVBoxLayout()
         self.left_layout.setAlignment(Qt.AlignTop)  # 设置左侧布局的对齐方式
 
-        # 创建振动数据图
-        xs = np.linspace(0, 1, self.window_size)  # x轴时间点
-        self.fig1, self.ax1 = plt.subplots()
-        self.ax1.set_ylim(self.distance_range)
-        self.ax1.set_xlim(0, 1)
-        self.ax1.set_title('Real-time Vibration Data', fontsize=18)
-        self.ax1.set_ylabel('Amplitude', fontsize=16)
-        self.ax1.tick_params(axis='both', which='major', labelsize=12)
-        self.line1, = self.ax1.plot(xs, self.data)
-        self.canvas1 = FigureCanvas(self.fig1)
-        self.canvas1.setFixedSize(1100, 480)  # 固定窗口大小
-        self.left_layout.addWidget(self.canvas1, alignment=Qt.AlignTop)
+        # 创建一个QWidget作为容器
+        self.text_container = QWidget()
+        self.text_container.setFixedSize(1100, 900)  # 固定窗口大小，和之前两个图像的大小相同
+        self.text_layout = QVBoxLayout()
+        self.text_layout.setAlignment(Qt.AlignCenter)  # 设置文本居中
 
-        # 创建FFT结果图
-        self.fig2, self.ax2 = plt.subplots()
-        self.ax2.set_xlim(self.FFT_frequency_range)
-        self.ax2.set_ylim(self.FFT_magnitude_range)
-        self.ax2.set_title('Real-time FFT Result', fontsize=18)
-        self.ax2.set_xlabel('Frequency (Hz)', fontsize=14)
-        self.ax2.set_ylabel('Magnitude', fontsize=16)
-        self.ax2.tick_params(axis='both', which='major', labelsize=12)
-        self.line2, = self.ax2.plot(self.frequencies, self.fft_result)
-        self.canvas2 = FigureCanvas(self.fig2)
-        self.canvas2.setFixedSize(1100, 470)  # 固定窗口大小
-        self.left_layout.addWidget(self.canvas2, alignment=Qt.AlignTop)
+        # 创建居中文本框
+        self.text_label = QLabel()
+        self.text_label.setAlignment(Qt.AlignCenter)
+        self.text_label.setFont(QFont('Arial', 50))
 
+        # 根据self.sampling_started设置文本内容
+        if self.sampling_started == False:
+            self.text_label.setText("Stop")
+        else:
+            self.text_label.setText("Sampling")
+
+        self.text_layout.addWidget(self.text_label)
+        self.text_container.setLayout(self.text_layout)
+        self.left_layout.addWidget(self.text_container, alignment=Qt.AlignTop)
 
         # 将左侧布局添加到主布局中
         self.main_layout.addLayout(self.left_layout)
@@ -128,7 +155,7 @@ class VibrationFFTApp(QMainWindow):
         self.right_layout.setAlignment(Qt.AlignTop)  # 设置右侧布局的对齐方式
 
         sol_font = QFont("Arial", 12)  # 设置字体为Arial，大小12
-        self.solution_label = QLabel("These are temporary words and will be replaced later. ..."*50, self)
+        self.solution_label = QLabel("", self)
         self.solution_label.setWordWrap(True)  # 自动换行
         self.solution_label.setAlignment(Qt.AlignTop)
         self.solution_label.setFont(sol_font)
@@ -138,11 +165,26 @@ class VibrationFFTApp(QMainWindow):
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.right_layout.addWidget(self.scroll_area, alignment=Qt.AlignTop)
-        self.scroll_area.setFixedSize(550, 650)
+        self.scroll_area.setFixedSize(550, 300)
         # 将 QLabel 设置为 QScrollArea 的小部件
         self.scroll_area.setWidget(self.solution_label)
         
+        
+        sol_font = QFont("Arial", 12)  # 设置字体为Arial，大小12
+        self.analysis = QLabel("", self)
+        self.analysis.setWordWrap(True)  # 自动换行
+        self.analysis.setAlignment(Qt.AlignTop)
+        self.analysis.setFont(sol_font)
+        self.analysis.setStyleSheet("QLabel { padding: 10px; border: 1px solid #ddd; background-color: #fff; }")
 
+        # 创建 QScrollArea
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.right_layout.addWidget(self.scroll_area, alignment=Qt.AlignTop)
+        self.scroll_area.setFixedSize(550, 450)
+        # 将 QLabel 设置为 QScrollArea 的小部件
+        self.scroll_area.setWidget(self.analysis)
+        
         # 创建按钮布局
         button_layout = QGridLayout()
 
@@ -221,30 +263,30 @@ class VibrationFFTApp(QMainWindow):
         self.t += 0.03
 
 
-        # 更新实时显示数据
-        self.data = np.roll(self.data, -1)
-        self.data[-1] = new_value
+        # # 更新实时显示数据
+        # self.data = np.roll(self.data, -1)
+        # self.data[-1] = new_value
 
-        self.line1.set_ydata(self.data)
-        self.canvas1.draw()
+        # self.line1.set_ydata(self.data)
+        # self.canvas1.draw()
 
-        # 每3次更新一次FFT图表
-        if self.counter % 3 == 0:
-            self.fft_result = np.abs(np.fft.fft(self.fft_data)[:self.fft_size // 2])
-            self.line2.set_ydata(self.fft_result)
-            self.canvas2.draw()
+        # # 每3次更新一次FFT图表
+        # if self.counter % 3 == 0:
+        #     self.fft_result = np.abs(np.fft.fft(self.fft_data)[:self.fft_size // 2])
+        #     self.line2.set_ydata(self.fft_result)
+        #     self.canvas2.draw()
 
-            # 找到超过阈值的峰值频率并更新标签
-            peak_indices, _ = find_peaks(self.fft_result, height=self.threshold)
-            peak_freqs = self.frequencies[peak_indices]
-            peak_info = '\n'.join([f"Peak Frequency: {freq:.2f} Hz" for freq in peak_freqs])
-            self.solution_label.setText(f"{peak_info}\n")
+        #     # 找到超过阈值的峰值频率并更新标签
+        #     peak_indices, _ = find_peaks(self.fft_result, height=self.threshold)
+        #     peak_freqs = self.frequencies[peak_indices]
+        #     peak_info = '\n'.join([f"Peak Frequency: {freq:.2f} Hz" for freq in peak_freqs])
+        #     self.solution_label.setText(f"{peak_info}\n")
 
-        # 更新FFT数据
-        self.fft_data = np.roll(self.fft_data, -1)
-        self.fft_data[-1] = new_value
+        # # 更新FFT数据
+        # self.fft_data = np.roll(self.fft_data, -1)
+        # self.fft_data[-1] = new_value
 
-        self.counter += 1
+        # self.counter += 1
         
 
 
@@ -257,21 +299,66 @@ class VibrationFFTApp(QMainWindow):
             
 
 
+    # def plot_final_data(self):
+    #     # 创建插值对象
+    #     x = np.linspace(0, self.stop_time, len(self.data_storage))
+
+    #     # 更新位移图像并绘制平滑曲线
+    #     self.ax1.clear()
+    #     # self.ax1.plot(x_new, y_new)
+    #     self.ax1.plot(x, self.data_storage)
+    #     self.ax1.set_ylim(self.distance_range)
+    #     self.ax1.set_title(f"Displacement over {self.stop_time:.2f} seconds", fontsize=18)
+    #     self.ax1.set_ylabel("Displacement", fontsize=16)
+    #     self.ax1.tick_params(axis='both', which='major', labelsize=12)
+    #     self.canvas1.draw()  # 更新canvas1
+
+    #     # 在所有数据上进行FFT
+    #     self.all_data_array = np.array(self.data_storage)
+    #     fft_result = np.fft.fft(self.all_data_array)
+    #     frequencies = np.fft.fftfreq(len(self.all_data_array), d=1/self.sampling_rate)
+    #     positive_frequencies = frequencies[:len(self.all_data_array)//2]
+    #     positive_fft_result = np.abs(fft_result[:len(self.all_data_array)//2])
+    #     print(positive_frequencies)
+    #     # messages.append(HumanMessage(content=f"sample rate: {self.sampling_rate} \
+    #     #     measured distance: {self.all_data_array}. After FFT, we get frequency: {self.frequencies} and\
+    #     #     amplitude: {self.fft_result_all}"))
+    #     # self.solution_label.setText(f"{model.invoke(messages).content}\n")
+        
+        
+    #     # 更新FFT图像
+    #     self.ax2.clear()
+    #     self.ax2.set_xlim(self.FFT_frequency_range)
+    #     self.ax2.set_ylim(self.FFT_magnitude_range)
+    #     self.ax2.set_title('FFT Result on All Data', fontsize=18)
+    #     self.ax2.set_xlabel('Frequency (Hz)', fontsize=14)
+    #     self.ax2.set_ylabel('Magnitude', fontsize=16)
+    #     self.ax2.tick_params(axis='both', which='major', labelsize=12)
+    #     self.ax2.plot(positive_frequencies, positive_fft_result)
+    #     self.canvas2.draw()  # 更新canvas2
+
+    #     # 确保布局中添加了更新后的图像
+    #     self.left_layout.update()
     def plot_final_data(self):
+        # 删除现有左侧布局的所有子控件
+        while self.left_layout.count():
+            child = self.left_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
         # 创建插值对象
         x = np.linspace(0, self.stop_time, len(self.data_storage))
-        # f = interp1d(x, self.data_storage, kind='cubic')
-        # x_new = np.linspace(0, self.stop_time, 500)
-        # y_new = f(x_new)
 
-        # 更新位移图像并绘制平滑曲线
-        self.ax1.clear()
-        # self.ax1.plot(x_new, y_new)
+        # 创建位移图像
+        self.fig1, self.ax1 = plt.subplots()
         self.ax1.plot(x, self.data_storage)
         self.ax1.set_ylim(self.distance_range)
         self.ax1.set_title(f"Displacement over {self.stop_time:.2f} seconds", fontsize=18)
         self.ax1.set_ylabel("Displacement", fontsize=16)
         self.ax1.tick_params(axis='both', which='major', labelsize=12)
+        self.canvas1 = FigureCanvas(self.fig1)
+        self.canvas1.setFixedSize(1100, 480)  # 固定窗口大小
+        self.left_layout.addWidget(self.canvas1, alignment=Qt.AlignTop)
         self.canvas1.draw()  # 更新canvas1
 
         # 在所有数据上进行FFT
@@ -280,15 +367,9 @@ class VibrationFFTApp(QMainWindow):
         frequencies = np.fft.fftfreq(len(self.all_data_array), d=1/self.sampling_rate)
         positive_frequencies = frequencies[:len(self.all_data_array)//2]
         positive_fft_result = np.abs(fft_result[:len(self.all_data_array)//2])
-        print(positive_frequencies)
-        # messages.append(HumanMessage(content=f"sample rate: {self.sampling_rate} \
-        #     measured distance: {self.all_data_array}. After FFT, we get frequency: {self.frequencies} and\
-        #     amplitude: {self.fft_result_all}"))
-        # self.solution_label.setText(f"{model.invoke(messages).content}\n")
         
-        
-        # 更新FFT图像
-        self.ax2.clear()
+        # 创建FFT图像
+        self.fig2, self.ax2 = plt.subplots()
         self.ax2.set_xlim(self.FFT_frequency_range)
         self.ax2.set_ylim(self.FFT_magnitude_range)
         self.ax2.set_title('FFT Result on All Data', fontsize=18)
@@ -296,10 +377,10 @@ class VibrationFFTApp(QMainWindow):
         self.ax2.set_ylabel('Magnitude', fontsize=16)
         self.ax2.tick_params(axis='both', which='major', labelsize=12)
         self.ax2.plot(positive_frequencies, positive_fft_result)
+        self.canvas2 = FigureCanvas(self.fig2)
+        self.canvas2.setFixedSize(1100, 470)  # 固定窗口大小
+        self.left_layout.addWidget(self.canvas2, alignment=Qt.AlignTop)
         self.canvas2.draw()  # 更新canvas2
-
-        # 确保布局中添加了更新后的图像
-        self.left_layout.update()
 
 
     def export_csv(self):

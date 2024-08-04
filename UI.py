@@ -34,6 +34,7 @@ class SerialReader:
 
     def read_from_serial(self):
         while not self.stop_event.is_set():
+            # print(self.ser.in_waiting)
             if self.ser.in_waiting > 0:
                 try:
                     line = self.ser.readline().decode('utf-8').rstrip()
@@ -44,9 +45,8 @@ class SerialReader:
                 except ValueError:
                     print("ValueError: could not convert string to float")
                     new_value = 0.0
-                # print("new value:", new_value)
                 new_value = min(new_value, 45.)
-                new_value = max(new_value, 0.)
+                new_value = max(new_value, 20.)
                 return new_value
 
     def start_receiving(self):
@@ -72,19 +72,11 @@ class VibrationFFTApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.sampling_started = False
-        self.sampling_rate = 30
-        self.window_size = 32
-        self.fft_size = 32
+        self.sampling_rate = 100
         self.update_interval_us = 0
-        self.frequencies = np.fft.fftfreq(self.fft_size, 1 / self.sampling_rate)[:self.fft_size // 2]
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_plot)
-        self.FFT_magnitude_range = (0, 200)
-        self.FFT_frequency_range = (0, self.sampling_rate // 2) 
-        self.data = np.zeros(self.window_size)
-        self.fft_result = np.zeros(self.fft_size // 2)
         self.data_storage = []
-        self.counter = 0
         self.port = 'COM5'  # 替换为实际的串口端口
         self.baudrate = 57600
         self.serial_reader = SerialReader(self.port, self.baudrate)
@@ -92,15 +84,16 @@ class VibrationFFTApp(QMainWindow):
         self.serial_reader.init_serial()
         self.serial_reader.start_receiving()
         distances = []
-        for _ in range(10):
+        for _ in range(21):
             distances.append(self.serial_reader.read_from_serial())
         self.serial_reader.stop_receiving()
         self.serial_reader.close_serial()
-        distances_mean = sum(distances) / len(distances)
+        distances = sorted(distances)
+        distances_median = distances[10]
         print(distances)
-        print("distance mean =", distances_mean)
-        # self.distance_range = (distances_mean-0.2, distances_mean+0.2)
-        self.distance_range = (20,45)
+        print("distance median =", distances_median)
+        # self.distance_range = (distances_median-0.2, distances_median+0.2)
+        self.distance_range = (20, 45)
         self.initUI()
 
 
@@ -148,36 +141,31 @@ class VibrationFFTApp(QMainWindow):
         # 创建主布局
         self.main_layout = QHBoxLayout(self.central_widget)
         self.main_layout.setSpacing(10)
-
+        
         # 创建左侧布局
         self.left_layout = QVBoxLayout()
         self.left_layout.setAlignment(Qt.AlignTop)  # 设置左侧布局的对齐方式
 
-        # 创建振动数据图
-        xs = np.linspace(0, self.window_size/self.sampling_rate, self.window_size)  # x轴时间点
-        self.fig1, self.ax1 = plt.subplots()
-        self.ax1.set_ylim(self.distance_range)
-        self.ax1.set_xlim(0, 1)
-        self.ax1.set_title('Real-time Vibration Data', fontsize=18)
-        self.ax1.set_ylabel('Amplitude', fontsize=16)
-        self.ax1.tick_params(axis='both', which='major', labelsize=12)
-        self.line1, = self.ax1.plot(xs, self.data)
-        self.canvas1 = FigureCanvas(self.fig1)
-        self.canvas1.setFixedSize(1100, 480)  # 固定窗口大小
-        self.left_layout.addWidget(self.canvas1, alignment=Qt.AlignTop)
+        # 创建一个QWidget作为容器
+        self.text_container = QWidget()
+        self.text_container.setFixedSize(1100, 900)  # 固定窗口大小，和之前两个图像的大小相同
+        self.text_layout = QVBoxLayout()
+        self.text_layout.setAlignment(Qt.AlignCenter)  # 设置文本居中
 
-        # 创建FFT结果图
-        self.fig2, self.ax2 = plt.subplots()
-        self.ax2.set_xlim(self.FFT_frequency_range)
-        self.ax2.set_ylim(self.FFT_magnitude_range)
-        self.ax2.set_title('Real-time FFT Result', fontsize=18)
-        self.ax2.set_xlabel('Frequency (Hz)', fontsize=14)
-        self.ax2.set_ylabel('Magnitude', fontsize=16)
-        self.ax2.tick_params(axis='both', which='major', labelsize=12)
-        self.line2, = self.ax2.plot(self.frequencies, self.fft_result)
-        self.canvas2 = FigureCanvas(self.fig2)
-        self.canvas2.setFixedSize(1100, 470)  # 固定窗口大小
-        self.left_layout.addWidget(self.canvas2, alignment=Qt.AlignTop)
+        # 创建居中文本框
+        self.text_label = QLabel()
+        self.text_label.setAlignment(Qt.AlignCenter)
+        self.text_label.setFont(QFont('Arial', 50))
+
+        # 根据self.sampling_started设置文本内容
+        if self.sampling_started == False:
+            self.text_label.setText("Stop")
+        else:
+            self.text_label.setText("Sampling")
+
+        self.text_layout.addWidget(self.text_label)
+        self.text_container.setLayout(self.text_layout)
+        self.left_layout.addWidget(self.text_container, alignment=Qt.AlignTop)
 
         # 将左侧布局添加到主布局中
         self.main_layout.addLayout(self.left_layout)
@@ -265,17 +253,12 @@ class VibrationFFTApp(QMainWindow):
         # 将右侧布局添加到主布局中
         self.main_layout.addLayout(self.right_layout)
 
-    def fresh(self):
-        self.data = np.zeros(self.window_size)
-        self.fft_result = np.zeros(self.fft_size // 2)
-        self.data_storage = []
-        self.counter = 0
 
     def start_sampling(self):
         if self.sampling_started == False:
-            self.fresh()
-            self.initUI()  # 重新初始化UI
+            self.data_storage = []
             self.sampling_started = True
+            self.initUI()  # 重新初始化UI
             self.serial_reader = SerialReader(self.port, self.baudrate)
             self.serial_reader.init_serial()
             self.start_time = time.time()
@@ -286,43 +269,18 @@ class VibrationFFTApp(QMainWindow):
     def update_plot(self):
         new_value = self.serial_reader.read_from_serial()
         self.data_storage.append(new_value)
-        
-        # 更新实时显示数据
-        self.data = np.roll(self.data, -1)
-        self.data[-1] = new_value
-
-        self.line1.set_ydata(self.data)
-        self.canvas1.draw()
-
-        # 每3次更新一次FFT图表
-        if self.counter > 31 and self.counter % 5 == 0:
-            self.fft_result = np.abs(np.fft.fft(self.data)[:self.fft_size // 2])
-            self.line2.set_ydata(self.fft_result)
-            self.canvas2.draw()
-
-            # 找到超过阈值的峰值频率并更新标签
-            peak_indices, _ = find_peaks(self.fft_result)
-            peak_info = "Peak Frequency:\n"
-            peak_info += '\n'.join([f"{self.frequencies[indices]:.2f} Hz: {self.fft_result[indices]:2f}" for indices in peak_indices])
-            self.solution_label.setText(f"{peak_info}\n")
-
-        self.counter += 1
-        
-
 
 
     def stop_update(self):
         if self.sampling_started == True:
             self.timer.stop()
             self.serial_reader.stop_receiving()
+            self.stop_time = time.time() - self.start_time  # 获取停止时间
             self.serial_reader.close_serial()
             self.sampling_started = False  # 标志停止采样
-            self.stop_time = time.time() - self.start_time  # 获取停止时间
             self.plot_final_data()
            
             
-
-
     def plot_final_data(self):
         analysis_result = """Relationship Between Fixture, U-shaped Middle Width, Input Pressure, and Amplitude
 Model Fit: The R-squared value is 0.753, indicating that about 75.3% of the variance in Amplitude is explained by the model.
@@ -337,45 +295,46 @@ U-shaped Middle Width (mm): The p-value is 0.531, indicating that the middle wid
 Input Pressure (bars): The p-value is 0.239, also suggesting no significant effect on frequency.
         """
         self.analysis.setText(analysis_result)
-        print("plot final distance data")
         final_box_text = ""
-        self.ax1.clear()
+        final_box_text += f"Distance Range:\n{min(self.data_storage)}mm ~ {max(self.data_storage)}mm\n"
+        
+        while self.left_layout.count():
+            child = self.left_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        # 创建插值对象
         x = np.linspace(0, self.stop_time, len(self.data_storage))
+
+        # 创建位移图像
+        self.fig1, self.ax1 = plt.subplots()
         self.ax1.plot(x, self.data_storage)
         self.ax1.set_ylim(self.distance_range)
         self.ax1.set_title(f"Displacement over {self.stop_time:.2f} seconds", fontsize=18)
         self.ax1.set_ylabel("Displacement", fontsize=16)
         self.ax1.tick_params(axis='both', which='major', labelsize=12)
+        self.canvas1 = FigureCanvas(self.fig1)
+        self.canvas1.setFixedSize(1100, 480)  # 固定窗口大小
+        self.left_layout.addWidget(self.canvas1, alignment=Qt.AlignTop)
         self.canvas1.draw()  # 更新canvas1
-        final_box_text += f"Distance Range:\n{min(self.data_storage)}mm ~ {max(self.data_storage)}mm\n"
-
+        
         # 在所有数据上进行FFT
-        print("plot final FFT result")
         all_data_array = np.array(self.data_storage)
         fft_result = np.fft.fft(all_data_array)
         frequencies = np.fft.fftfreq(len(all_data_array), d=1/self.sampling_rate)
         positive_frequencies = frequencies[:len(all_data_array)//2]
         positive_fft_result = np.abs(fft_result[:len(all_data_array)//2])
-
-        window_length = 11
-        polyorder = 2
-        # smoothed_fft_result = savgol_filter(positive_fft_result, window_length=window_length, polyorder=polyorder)
-        smoothed_fft_result = positive_fft_result
-        print("len of smoothed_fft_result = ", len(smoothed_fft_result))
-        # 手动设置噪声的最大频率，然后找到三个频率峰值，noise_freq可调节
         noise_freq = 2
         non_noise_min_index = next((i for i, freq in enumerate(positive_frequencies) if freq > noise_freq), None)
         if non_noise_min_index is None:
             raise ValueError("No frequencies found above the noise frequency threshold")
-
-        peaks, _ = find_peaks(smoothed_fft_result[non_noise_min_index:])
-
+        peaks, _ = find_peaks(positive_fft_result[non_noise_min_index:])
         # 根据振幅大小对峰值进行排序，并选择振幅最大的三个峰值
         peak_freq_num = 3
-        sorted_peaks = sorted(peaks, key=lambda x: smoothed_fft_result[non_noise_min_index + x], reverse=True)
+        sorted_peaks = sorted(peaks, key=lambda x: positive_fft_result[non_noise_min_index + x], reverse=True)
         top_peaks = sorted_peaks[:peak_freq_num]
         peak_frequencies = positive_frequencies[non_noise_min_index:][top_peaks]
-        peak_amplitudes = smoothed_fft_result[non_noise_min_index:][top_peaks]
+        peak_amplitudes = positive_fft_result[non_noise_min_index:][top_peaks]
         final_box_text += 'Peak Frequencies:\n'
         for i in range(peak_freq_num):
             final_box_text += f"{peak_frequencies[i]:.2f} Hz: {peak_amplitudes[i]:.2f}\n"
@@ -383,25 +342,21 @@ Input Pressure (bars): The p-value is 0.239, also suggesting no significant effe
         # 找到第peak_freq_num+1高的峰值
         next_peak = sorted_peaks[peak_freq_num] if len(sorted_peaks) > peak_freq_num else None
         next_peak_frequency = positive_frequencies[non_noise_min_index + next_peak] if next_peak is not None else None
-        next_peak_amplitude = smoothed_fft_result[non_noise_min_index + next_peak] if next_peak is not None else None
-
-        
-        # 更新FFT图像
-        self.ax2.clear()
+        next_peak_amplitude = positive_fft_result[non_noise_min_index + next_peak] if next_peak is not None else None
+        self.fig2, self.ax2 = plt.subplots()
         self.ax2.set_xlim(noise_freq, self.sampling_rate // 2)
-        self.ax2.set_ylim(next_peak_amplitude, max(smoothed_fft_result[non_noise_min_index:])*1.2)
+        self.ax2.set_ylim(next_peak_amplitude, max(positive_fft_result[non_noise_min_index:])*1.2)
         self.ax2.set_title('FFT Result on All Data', fontsize=18)
         self.ax2.set_xlabel('Frequency (Hz)', fontsize=14)
         self.ax2.set_ylabel('Magnitude', fontsize=16)
         self.ax2.tick_params(axis='both', which='major', labelsize=12)
-        self.ax2.plot(positive_frequencies, smoothed_fft_result)
-        plt.plot(peak_frequencies, peak_amplitudes, 'ro') 
-        # if next_peak is not None:
-        #     plt.axhline(y=next_peak_amplitude, color='g', linestyle='--', label=f'{peak_freq_num+1} Peak Amplitude ({next_peak_amplitude:.2f})')
+        self.ax2.plot(positive_frequencies, positive_fft_result)
+        self.ax2.plot(peak_frequencies, peak_amplitudes, 'ro') 
+        self.canvas2 = FigureCanvas(self.fig2)
+        self.canvas2.setFixedSize(1100, 470)  # 固定窗口大小
+        self.left_layout.addWidget(self.canvas2, alignment=Qt.AlignTop)
         self.canvas2.draw()  # 更新canvas2
-
-        # 确保布局中添加了更新后的图像
-        self.left_layout.update()
+        print("plot final distance and FFT figures")
 
 
     def export_csv(self):
