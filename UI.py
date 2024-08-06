@@ -25,7 +25,7 @@ class SerialReader:
 
     def init_serial(self):
         try:
-            self.ser = serial.Serial(self.port, self.baudrate, timeout=0.01)  # 设置合理的波特率
+            self.ser = serial.Serial(self.port, self.baudrate, timeout=0.01) 
             self.ser.flush()
         except serial.SerialException as e:
             print(f"Could not open serial port: {e}")
@@ -34,7 +34,6 @@ class SerialReader:
 
     def read_from_serial(self):
         while not self.stop_event.is_set():
-            # print(self.ser.in_waiting)
             if self.ser.in_waiting > 0:
                 try:
                     line = self.ser.readline().decode('utf-8').rstrip()
@@ -51,7 +50,7 @@ class SerialReader:
 
     def start_receiving(self):
         self.stop_event.clear()
-        self.ser.reset_input_buffer()  # 清除串口输入缓冲区中的所有数据
+        self.ser.reset_input_buffer() 
         self.read_thread = threading.Thread(target=self.read_from_serial)
         self.read_thread.start()
         print("Reading thread started.")
@@ -77,7 +76,7 @@ class VibrationFFTApp(QMainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_plot)
         self.data_storage = []
-        self.port = 'COM5'  # 替换为实际的串口端口
+        self.port = 'COM5' 
         self.baudrate = 57600
         self.serial_reader = SerialReader(self.port, self.baudrate)
         # get distance range
@@ -92,8 +91,7 @@ class VibrationFFTApp(QMainWindow):
         distances_median = distances[10]
         print(distances)
         print("distance median =", distances_median)
-        # self.distance_range = (distances_median-0.2, distances_median+0.2)
-        self.distance_range = (20, 45)
+        self.distance_range = (distances_median-0.2, distances_median+0.2)
         self.initUI()
 
 
@@ -101,11 +99,7 @@ class VibrationFFTApp(QMainWindow):
     def initUI(self):
         print("Start initUI...")
         self.setWindowTitle('SU24 ECE/ME/MSE450 Group24: Vibration Detection and Analysis System')
-
-        # 设置固定窗口大小
         self.setFixedSize(2000, 1000)
-
-        # 设置整个窗口背景为白色
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #f0f0f0;
@@ -115,51 +109,50 @@ class VibrationFFTApp(QMainWindow):
                 font-size: 14px;
             }
             QPushButton {
-                background-color: #4CAF50; /* 绿色背景 */
-                border: none; /* 无边框 */
-                color: white; /* 白色字体 */
-                padding: 15px 32px; /* 按钮内边距 */
-                text-align: center; /* 文字居中 */
-                font-size: 24px; /* 字体大小 */
-                margin: 4px 2px; /* 外边距 */
-                border-radius: 12px; /* 圆角 */
+                background-color: #4CAF50; 
+                border: none; 
+                color: white;
+                padding: 15px 32px; 
+                text-align: center; 
+                font-size: 24px; 
+                margin: 4px 2px; 
+                border-radius: 12px; 
             }
             QPushButton:hover {
-                background-color: white; /* 悬停背景颜色 */
-                color: black; /* 悬停字体颜色 */
-                border: 2px solid #4CAF50; /* 悬停边框 */
+                background-color: white; 
+                color: black; 
+                border: 2px solid #4CAF50; 
             }
             QPushButton:pressed {
-                background-color: #45a049; /* 按下背景颜色 */
+                background-color: #45a049; 
             }
         """)
 
-        # 创建中央窗口部件
+        # Create a central widget
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
 
-        # 创建主布局
+        # Create the main layout
         self.main_layout = QHBoxLayout(self.central_widget)
         self.main_layout.setSpacing(10)
         
-        # 创建左侧布局
+        # Create left side layout
         self.left_layout = QVBoxLayout()
-        self.left_layout.setAlignment(Qt.AlignTop)  # 设置左侧布局的对齐方式
+        self.left_layout.setAlignment(Qt.AlignTop)  
 
-        # 创建一个QWidget作为容器
+        # Create a QWidget as a container
         self.text_container = QWidget()
-        self.text_container.setFixedSize(1100, 900)  # 固定窗口大小，和之前两个图像的大小相同
+        self.text_container.setFixedSize(1100, 900)  
         self.text_layout = QVBoxLayout()
-        self.text_layout.setAlignment(Qt.AlignCenter)  # 设置文本居中
+        self.text_layout.setAlignment(Qt.AlignCenter) 
 
-        # 创建居中文本框
+        # Create a centered text box
         self.text_label = QLabel()
         self.text_label.setAlignment(Qt.AlignCenter)
         self.text_label.setFont(QFont('Arial', 50))
 
-        # 根据self.sampling_started设置文本内容
         if self.sampling_started == False:
-            self.text_label.setText("Stop")
+            self.text_label.setText("Click Start Sampling")
         else:
             self.text_label.setText("Sampling")
 
@@ -167,70 +160,64 @@ class VibrationFFTApp(QMainWindow):
         self.text_container.setLayout(self.text_layout)
         self.left_layout.addWidget(self.text_container, alignment=Qt.AlignTop)
 
-        # 将左侧布局添加到主布局中
         self.main_layout.addLayout(self.left_layout)
 
-        # 创建右侧垂直布局
+        # Create the right vertical layout
         self.right_layout = QVBoxLayout()
-        self.right_layout.setAlignment(Qt.AlignTop)  # 设置右侧布局的对齐方式
+        self.right_layout.setAlignment(Qt.AlignTop) 
 
-        sol_font = QFont("Arial", 12)  # 设置字体为Arial，大小12
+        sol_font = QFont("Arial", 12) 
         self.solution_label = QLabel("", self)
-        self.solution_label.setWordWrap(True)  # 自动换行
+        self.solution_label.setWordWrap(True)  # Auto wrap
         self.solution_label.setAlignment(Qt.AlignTop)
         self.solution_label.setFont(sol_font)
         self.solution_label.setStyleSheet("QLabel { padding: 10px; border: 1px solid #ddd; background-color: #fff; }")
 
-        # 创建 QScrollArea
+        # create QScrollArea
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.right_layout.addWidget(self.scroll_area, alignment=Qt.AlignTop)
         self.scroll_area.setFixedSize(550, 300)
-        # 将 QLabel 设置为 QScrollArea 的小部件
         self.scroll_area.setWidget(self.solution_label)
         
         
-        sol_font = QFont("Arial", 12)  # 设置字体为Arial，大小12
+        sol_font = QFont("Arial", 12)  
         self.analysis = QLabel("", self)
-        self.analysis.setWordWrap(True)  # 自动换行
+        self.analysis.setWordWrap(True)  
         self.analysis.setAlignment(Qt.AlignTop)
         self.analysis.setFont(sol_font)
         self.analysis.setStyleSheet("QLabel { padding: 10px; border: 1px solid #ddd; background-color: #fff; }")
 
-        # 创建 QScrollArea
+        # create QScrollArea
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.right_layout.addWidget(self.scroll_area, alignment=Qt.AlignTop)
         self.scroll_area.setFixedSize(550, 450)
-        # 将 QLabel 设置为 QScrollArea 的小部件
         self.scroll_area.setWidget(self.analysis)
         
-        # 创建按钮布局
+        # create buttons
         button_layout = QGridLayout()
 
-        # 创建四个按钮
+        # create 4 buttons
         self.button1 = QPushButton("Start Sampling")
         self.button1.clicked.connect(self.start_sampling)
         self.button2 = QPushButton("End Sampling")
-        self.button2.clicked.connect(self.stop_update)  # 连接按钮到stop_update方法
+        self.button2.clicked.connect(self.stop_update)
         self.button3 = QPushButton("Export .CSV")
         self.button3.clicked.connect(self.export_csv)
         self.button4 = QPushButton("Export Report")
         self.button4.clicked.connect(self.export_report)
 
-        # 将按钮添加到布局中
         button_layout.addWidget(self.button1, 0, 0)
         button_layout.addWidget(self.button2, 0, 1)
         button_layout.addWidget(self.button3, 1, 0)
         button_layout.addWidget(self.button4, 1, 1)
 
-        # 将按钮布局添加到右侧布局中
         self.right_layout.addLayout(button_layout)
 
-        # 创建一个水平布局来放置两个logo
         logo_layout = QHBoxLayout()
 
-        # 添加JI Logo
+        # add JI Logo
         logoji_label = QLabel(self)
         pixmap_ji = QPixmap('./UMJI_logo.png')
         logoji_label.setPixmap(pixmap_ji)
@@ -238,7 +225,7 @@ class VibrationFFTApp(QMainWindow):
         logoji_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
         logo_layout.addWidget(logoji_label)
 
-        # 添加Systence Logo
+        # add Systence Logo
         logoco_label = QLabel(self)
         pixmap_co = QPixmap('./systence_logo.png')
         logoco_label.setPixmap(pixmap_co)
@@ -246,11 +233,9 @@ class VibrationFFTApp(QMainWindow):
         logoco_label.setAlignment(Qt.AlignBottom)
         logo_layout.addWidget(logoco_label)
 
-        # 在右侧布局中添加一个弹性空间和logo布局
-        self.right_layout.addStretch()  # 添加弹性空间，将logo推到最下方
+        self.right_layout.addStretch() 
         self.right_layout.addLayout(logo_layout)
 
-        # 将右侧布局添加到主布局中
         self.main_layout.addLayout(self.right_layout)
 
 
@@ -258,7 +243,7 @@ class VibrationFFTApp(QMainWindow):
         if self.sampling_started == False:
             self.data_storage = []
             self.sampling_started = True
-            self.initUI()  # 重新初始化UI
+            self.initUI()  
             self.serial_reader = SerialReader(self.port, self.baudrate)
             self.serial_reader.init_serial()
             self.start_time = time.time()
@@ -275,9 +260,9 @@ class VibrationFFTApp(QMainWindow):
         if self.sampling_started == True:
             self.timer.stop()
             self.serial_reader.stop_receiving()
-            self.stop_time = time.time() - self.start_time  # 获取停止时间
+            self.stop_time = time.time() - self.start_time  # get stop time
             self.serial_reader.close_serial()
-            self.sampling_started = False  # 标志停止采样
+            self.sampling_started = False  
             self.plot_final_data()
            
             
@@ -303,10 +288,9 @@ Input Pressure (bars): The p-value is 0.239, also suggesting no significant effe
             if child.widget():
                 child.widget().deleteLater()
 
-        # 创建插值对象
         x = np.linspace(0, self.stop_time, len(self.data_storage))
 
-        # 创建位移图像
+        # distance final plot
         self.fig1, self.ax1 = plt.subplots()
         self.ax1.plot(x, self.data_storage)
         self.ax1.set_ylim(self.distance_range)
@@ -314,11 +298,11 @@ Input Pressure (bars): The p-value is 0.239, also suggesting no significant effe
         self.ax1.set_ylabel("Displacement", fontsize=16)
         self.ax1.tick_params(axis='both', which='major', labelsize=12)
         self.canvas1 = FigureCanvas(self.fig1)
-        self.canvas1.setFixedSize(1100, 480)  # 固定窗口大小
+        self.canvas1.setFixedSize(1100, 480)  
         self.left_layout.addWidget(self.canvas1, alignment=Qt.AlignTop)
-        self.canvas1.draw()  # 更新canvas1
+        self.canvas1.draw()  
         
-        # 在所有数据上进行FFT
+        # conduct FFT on all collected data
         all_data_array = np.array(self.data_storage)
         fft_result = np.fft.fft(all_data_array)
         frequencies = np.fft.fftfreq(len(all_data_array), d=1/self.sampling_rate)
@@ -329,7 +313,7 @@ Input Pressure (bars): The p-value is 0.239, also suggesting no significant effe
         if non_noise_min_index is None:
             raise ValueError("No frequencies found above the noise frequency threshold")
         peaks, _ = find_peaks(positive_fft_result[non_noise_min_index:])
-        # 根据振幅大小对峰值进行排序，并选择振幅最大的三个峰值
+        # sort peaks and select 3 peaks
         peak_freq_num = 3
         sorted_peaks = sorted(peaks, key=lambda x: positive_fft_result[non_noise_min_index + x], reverse=True)
         top_peaks = sorted_peaks[:peak_freq_num]
@@ -339,7 +323,7 @@ Input Pressure (bars): The p-value is 0.239, also suggesting no significant effe
         for i in range(peak_freq_num):
             final_box_text += f"{peak_frequencies[i]:.2f} Hz: {peak_amplitudes[i]:.2f}\n"
         self.solution_label.setText(final_box_text)
-        # 找到第peak_freq_num+1高的峰值
+        # find peak_freq_num+1 highest peak
         next_peak = sorted_peaks[peak_freq_num] if len(sorted_peaks) > peak_freq_num else None
         next_peak_frequency = positive_frequencies[non_noise_min_index + next_peak] if next_peak is not None else None
         next_peak_amplitude = positive_fft_result[non_noise_min_index + next_peak] if next_peak is not None else None
@@ -353,17 +337,15 @@ Input Pressure (bars): The p-value is 0.239, also suggesting no significant effe
         self.ax2.plot(positive_frequencies, positive_fft_result)
         self.ax2.plot(peak_frequencies, peak_amplitudes, 'ro') 
         self.canvas2 = FigureCanvas(self.fig2)
-        self.canvas2.setFixedSize(1100, 470)  # 固定窗口大小
+        self.canvas2.setFixedSize(1100, 470)  
         self.left_layout.addWidget(self.canvas2, alignment=Qt.AlignTop)
-        self.canvas2.draw()  # 更新canvas2
+        self.canvas2.draw() 
         print("plot final distance and FFT figures")
 
 
     def export_csv(self):
         if self.sampling_started == False:
-            # 获取当前日期和时间
             current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-            # 设置默认文件名
             default_file_name = f"vibration_data_{current_time}.csv"
             
             options = QFileDialog.Options()
@@ -378,25 +360,19 @@ Input Pressure (bars): The p-value is 0.239, also suggesting no significant effe
 
     def export_report(self):
         if self.sampling_started == False:
-            # 获取当前日期和时间
             current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-            # 设置默认文件名
             default_file_name = f"report_{current_time}.html"
 
             options = QFileDialog.Options()
             filePath, _ = QFileDialog.getSaveFileName(self, "Save Report", default_file_name, "HTML Files (*.html);;All Files (*)", options=options)
             if filePath:
-                # 保存当前图像
                 distance_image_path = "distance_plot.png"
                 fft_image_path = "fft_plot.png"
                 self.fig1.savefig(distance_image_path)
                 self.fig2.savefig(fft_image_path)
-
-                # 获取文本框内容
                 text1 = self.solution_label.text()
                 text2 = self.analysis.text()
                 
-                # 生成HTML内容
                 html_content = f"""
                 <html>
                 <head>
@@ -415,8 +391,6 @@ Input Pressure (bars): The p-value is 0.239, also suggesting no significant effe
                 </body>
                 </html>
                 """
-
-                # 将HTML内容写入文件
                 with open(filePath, 'w') as file:
                     file.write(html_content)
 
